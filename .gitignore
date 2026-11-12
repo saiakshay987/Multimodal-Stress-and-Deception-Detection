@@ -225,3 +225,11 @@ data/
 features/
 features_perturbed/
 checkpoints/
+MAS/
+*.mp4
+*.avi
+*.wav
+*.npy
+*.npz
+*.pt
+*.ckpt
