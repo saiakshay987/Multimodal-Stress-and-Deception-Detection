@@ -259,7 +259,8 @@ def predict(model, loader, device, forward=forward_multimodal):
 
 
 def train_model(model, train_loader, val_loader, device, *, pos_weight=1.0, lr=1e-3, weight_decay=1e-2,
-                max_epochs=100, patience=10, accum_steps=1, forward=forward_multimodal, log_every=10):
+                max_epochs=100, patience=10, accum_steps=1, forward=forward_multimodal, log_every=10,
+                loss_fn=None, score_fn=None):
     """Train with AdamW + BCE(pos_weight), fp16 autocast on CUDA and early stopping.
 
     The score for early stopping is the validation macro-F1 at threshold 0.5. On return, ``model``
@@ -269,13 +270,18 @@ def train_model(model, train_loader, val_loader, device, *, pos_weight=1.0, lr=1
         accum_steps: gradient accumulation steps (effective batch = batch size * accum_steps).
         forward: callable (model, batch, device) -> logits (B,).
         log_every: print a line every this many epochs (and at the last one).
+        loss_fn: optional callable (logits, batch, device) -> scalar loss; default is BCE(pos_weight).
+        score_fn: optional callable (validation predictions DataFrame) -> float to maximise for early
+            stopping; default is macro-F1 over all validation clips.
 
     Returns:
         dict with best_epoch (1-based), best_val_macro_f1, epochs_run, history (list of dicts).
     """
     model.to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor(float(pos_weight), device=device))
+    if loss_fn is None:
+        _bce = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor(float(pos_weight), device=device))
+        loss_fn = lambda logits, batch, dev: _bce(logits.float(), batch["label"].to(dev))
     use_amp = device.type == "cuda"
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     stopper = EarlyStopper(patience)
@@ -288,17 +294,17 @@ def train_model(model, train_loader, val_loader, device, *, pos_weight=1.0, lr=1
         for i, batch in enumerate(train_loader):
             with _autocast(device):
                 logits = forward(model, batch, device)
-            y = batch["label"].to(device)
-            loss = loss_fn(logits.float(), y)
+            n_b = len(batch["label"])
+            loss = loss_fn(logits, batch, device)
             scaler.scale(loss / accum_steps).backward()
             if (i + 1) % accum_steps == 0 or i + 1 == n_batches:
                 scaler.step(opt)
                 scaler.update()
                 opt.zero_grad(set_to_none=True)
-            total += loss.item() * len(y)
-            n_seen += len(y)
+            total += loss.item() * n_b
+            n_seen += n_b
         val = predict(model, val_loader, device, forward)
-        val_f1 = compute_metrics(val["label"], val["prob"])["macro_f1"]
+        val_f1 = score_fn(val) if score_fn else compute_metrics(val["label"], val["prob"])["macro_f1"]
         improved = stopper.update(val_f1, epoch, model)
         history.append({"epoch": epoch, "train_loss": total / max(n_seen, 1), "val_macro_f1": val_f1})
         last = stopper.should_stop or epoch == max_epochs
