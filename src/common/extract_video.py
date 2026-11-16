@@ -6,6 +6,14 @@ Usage:
     python src/common/extract_video.py bol
     python src/common/extract_video.py rlt --metadata some/other/metadata.csv
     python src/common/extract_video.py bol --data_root data --features_root features
+    python src/common/extract_video.py bol --perturb brightness --level 0.5 --clip-ids ids.txt
+
+--perturb {brightness,gamma} --level X: every sampled frame is perturbed before face detection
+(brightness: pixel * X, saturating, X >= 0; gamma: 255 * (pixel / 255) ** (1 / X), X > 0, so
+X > 1 brightens) and the output goes to <perturbed_root>/<perturb>_<X>/<dataset>/ (default
+perturbed_root: features_perturbed) instead of <features_root>/<dataset>/. The metadata is still
+read from <features_root>/<dataset>/metadata.csv; nothing under <features_root> is written.
+--clip-ids FILE: process only the clip_ids listed in FILE (one per line, blank lines ignored).
 
 Reads <features_root>/<dataset>/metadata.csv (or --metadata). For every row, the clip
 <data_root>/<video_path> is read with OpenCV, frames are sampled at 5 fps for at most the
@@ -231,6 +239,16 @@ def sample_frames(path):
         cap.release()
 
 
+def make_perturbation(kind, level):
+    """Return a function BGR uint8 frame -> perturbed BGR uint8 frame."""
+    if kind == "brightness":
+        return lambda frame: cv2.convertScaleAbs(frame, alpha=level)
+    if kind == "gamma":
+        lut = np.clip(np.round(255.0 * (np.arange(256) / 255.0) ** (1.0 / level)), 0, 255).astype(np.uint8)
+        return lambda frame: cv2.LUT(frame, lut)
+    raise ValueError(f"unknown perturbation: {kind}")
+
+
 def largest_face_box(detector, mp, rgb):
     """(x0, y0, x1, y1) integer crop window (square, 20% margin, clipped) or None."""
     res = detector.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
@@ -260,13 +278,16 @@ def flow_stats(prev_gray, gray):
     return float(mag.mean()), float(mag.std())
 
 
-def process_clip(path, detector, mp):
-    """Run detection / cropping / flow on one clip. Returns dict of per-frame arrays."""
+def process_clip(path, detector, mp, perturb=None):
+    """Run detection / cropping / flow on one clip. Returns dict of per-frame arrays.
+    perturb: optional function applied to each BGR frame before face detection."""
     valid, flow, crops64, crops224 = [], [], [], []
     prev_gray = None
     n = 0
     for frame in sample_frames(path):
         n += 1
+        if perturb is not None:
+            frame = perturb(frame)
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         box = largest_face_box(detector, mp, rgb)
         if box is None:
@@ -358,7 +379,23 @@ def parse_args():
     ap.add_argument("--n_examples", type=int, default=3, help="number of example crops (default: 3)")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--verbose", action="store_true", help="print the shapes of all keys for every clip")
-    return ap.parse_args()
+    ap.add_argument("--perturb", choices=("brightness", "gamma"), default=None,
+                    help="perturb every frame before face detection (needs --level); output goes to "
+                         "<perturbed_root>/<perturb>_<level>/<dataset>/ instead of <features_root>/<dataset>/")
+    ap.add_argument("--level", type=float, default=None,
+                    help="strength of --perturb: brightness multiplier (>= 0) or gamma (> 0)")
+    ap.add_argument("--perturbed_root", default="features_perturbed",
+                    help="folder for perturbed features (default: features_perturbed)")
+    ap.add_argument("--clip-ids", "--clip_ids", dest="clip_ids", default=None,
+                    help="text file with one clip_id per line; only these clips are processed")
+    args = ap.parse_args()
+    if (args.perturb is None) != (args.level is None):
+        ap.error("--perturb and --level must be given together")
+    if args.perturb == "brightness" and not args.level >= 0:
+        ap.error("--level for brightness must be >= 0")
+    if args.perturb == "gamma" and not args.level > 0:
+        ap.error("--level for gamma must be > 0")
+    return args
 
 
 def main():
@@ -368,12 +405,27 @@ def main():
 
     feat_dir = Path(args.features_root) / args.dataset
     meta_path = Path(args.metadata) if args.metadata else feat_dir / "metadata.csv"
+    perturb = None
+    if args.perturb:  # write somewhere else; the clean feat_dir is only read (metadata)
+        perturb = make_perturbation(args.perturb, args.level)
+        feat_dir = Path(args.perturbed_root) / f"{args.perturb}_{args.level:g}" / args.dataset
+        print(f"perturbation: {args.perturb} level {args.level:g} -> {feat_dir}")
     if not meta_path.exists():
         sys.exit(f"metadata not found: {meta_path}")
     df = pd.read_csv(meta_path, dtype={"clip_id": str})
     for col in ("clip_id", "video_path"):
         if col not in df.columns:
             sys.exit(f"{meta_path} has no column '{col}'")
+    if args.clip_ids:
+        with open(args.clip_ids) as f:
+            wanted = [ln.strip() for ln in f if ln.strip()]
+        missing = sorted(set(wanted) - set(df["clip_id"]))
+        if missing:
+            print(f"warning: {len(missing)} clip_ids from {args.clip_ids} are not in {meta_path}: "
+                  f"{', '.join(missing[:5])}{' ...' if len(missing) > 5 else ''}")
+        df = df[df["clip_id"].isin(set(wanted))]
+        if df.empty:
+            sys.exit(f"none of the clip_ids in {args.clip_ids} are in {meta_path}")
     if args.limit is not None:
         df = df.head(args.limit)
 
@@ -415,7 +467,7 @@ def main():
             existing = feat_dir / f"{clip_id}.npz"
             if existing.exists() and npz_keys(existing) is None:
                 raise RuntimeError(f"existing {existing.name} is unreadable; not overwriting it")
-            r = process_clip(video, detector, mp)
+            r = process_clip(video, detector, mp, perturb)
             valid = r["valid"]
             t = len(valid)
             n_face = int(valid.sum())
