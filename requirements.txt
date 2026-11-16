@@ -7,3 +7,5 @@ transformers
 praat-parselmouth
 soundfile
 tqdm
+peft
+matplotlib
