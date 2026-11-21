@@ -4,7 +4,6 @@ Generated from the CSVs under `results/` (nothing re-trained). Branch `akshay`; 
 
 ## Missing inputs (not guessed)
 
-- `results/stress/runs/scratch_audio_runs.csv` — stress, from-scratch family (README names it; src/stress/scratch_audio.py exists)
 - `Harshith's stress error analysis` — error analysis, stress part (no file in results/, docs/ or on any remote branch mentions it)
 - No cross-dataset (BoL→RLT, RLT→BoL) deception **fine-tuning** results and no within-RLT deception fine-tuning results exist (`results/deception/finetune*.csv` only hold train=bol/test=bol and train=bol+rlt/test=bol+rlt). Those cells are shown as *not run*.
 - No **pooled** and no **cross-dataset** deception **from-scratch** results exist (`results/deception/scratch_video.csv` only has within_bol and within_rlt) and no pooled deception baseline (`baseline.csv` has within and cross only). Shown as *not run*.
@@ -37,7 +36,7 @@ Generated from the CSVs under `results/` (nothing re-trained). Branch `akshay`; 
 | fine-tuning (LoRA r=8) | concat | 5 | 0 only | 0.517 ± 0.056 | 0.469 ± 0.045 | 0.478 ± 0.082 |
 | fine-tuning (LoRA r=8) | audio | 5 | 0 only | 0.588 ± 0.112 | 0.499 ± 0.056 | 0.574 ± 0.139 |
 | fine-tuning (LoRA r=8) | video | 5 | 0 only | 0.457 ± 0.087 | 0.444 ± 0.097 | 0.441 ± 0.088 |
-| from scratch (audio CNN) | — | — | — | *not available* | *not available* | *not available* |
+| from scratch (audio CNN) | audio | 15 | 0,1,2 | 0.598 ± 0.104 | 0.561 ± 0.102 | 0.605 ± 0.129 |
 
 Reference (same 5 folds, `baseline.csv`): always predicting the overall majority class (label 0) gives accuracy 0.511 ± 0.179 and macro-F1 0.331 ± 0.078; the training-fold majority class gives accuracy 0.411 ± 0.149 and macro-F1 0.285 ± 0.073. Fold test sizes are 79/72/54/132/48 clips, so the fold std is large.
 
@@ -315,4 +314,4 @@ Every cell is within chance range, including the unperturbed one, so this single
 
 ## Source files used
 
-All CSV/text files under `results/` were inspected; `*_predictions.csv` files were used only for the recomputed p-values and per-dataset fine-tuning metrics. `deception/runs/*_summary.csv`, `runs/*_runs.csv`, the `*_smoke*`-free per-run files and `run_all.log` were read for cross-checks only (they carry the same numbers as `deep.csv`). `leakage_ablation_overlap.csv` was used for the overlap column.
+All CSV/text files under `results/` were inspected; `*_predictions.csv` files were used only for the recomputed p-values and per-dataset fine-tuning metrics. `deception/runs/*_summary.csv`, `runs/*_runs.csv`, the `*_smoke*`-free per-run files and `run_all.log` were read for cross-checks only (they carry the same numbers as `deep.csv`). `leakage_ablation_overlap.csv` was used for the overlap column. The stress from-scratch audio row in section 1 comes from `stress/scratch_audio.csv` and `stress/runs/scratch_audio_runs.csv`.
