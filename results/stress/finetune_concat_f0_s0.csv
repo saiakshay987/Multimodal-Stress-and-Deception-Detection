@@ -1,0 +1,2 @@
+setup,task,train_datasets,test_datasets,mode,fold,seed,dropout,weight_decay,n_train,n_val,n_test,best_epoch,epochs_run,val_macro_f1,accuracy,macro_f1,roc_auc,time_s,peak_gpu_mb,device
+task=stress;train=mas;test=mas;dropout=0.3;wd=0.01;ft=lora8,stress,mas,mas,concat,0,0,0.3,0.01,230,76,79,5,10,0.5451968503937008,0.569620253164557,0.4309322033898305,0.43724137931034485,507.9,1406.0,cuda
