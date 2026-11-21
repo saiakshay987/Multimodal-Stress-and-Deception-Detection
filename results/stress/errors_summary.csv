@@ -1,0 +1,5 @@
+mode,metric,numerator,denominator,value
+audio,stress_recall_overall,105,170,0.6176470588235294
+audio,stress_recall_sentiment_only,48,80,0.6
+audio,stress_recall_nonverbal,57,90,0.6333333333333333
+audio,false_positive_rate,71,215,0.3302325581395349
