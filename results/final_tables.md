@@ -4,7 +4,6 @@ Generated from the CSVs under `results/` (nothing re-trained). Branch `akshay`; 
 
 ## Missing inputs (not guessed)
 
-- `Harshith's stress error analysis` — error analysis, stress part (no file in results/, docs/ or on any remote branch mentions it)
 - No cross-dataset (BoL→RLT, RLT→BoL) deception **fine-tuning** results and no within-RLT deception fine-tuning results exist (`results/deception/finetune*.csv` only hold train=bol/test=bol and train=bol+rlt/test=bol+rlt). Those cells are shown as *not run*.
 - No **pooled** and no **cross-dataset** deception **from-scratch** results exist (`results/deception/scratch_video.csv` only has within_bol and within_rlt) and no pooled deception baseline (`baseline.csv` has within and cross only). Shown as *not run*.
 - Own recordings: no such data in this project, so that table is intentionally left out.
@@ -286,7 +285,8 @@ The difference rows are differences of the two means (the CSV has no std for the
 
 ## 7. Error analysis (one line each)
 
-- **Stress (Harshith):** *not available* — no stress error-analysis file exists in the repository or on any remote branch (listed under missing inputs).
+- **Stress (`results/stress/error_notes.md`, `errors.csv`, `errors_summary.csv`):** best audio model, test probabilities averaged over seeds per clip, threshold 0.5: stress recall 105/170 = 0.618 (sentiment-only clips 48/80 = 0.600, non-verbal clips 57/90 = 0.633), false-positive rate 71/215 = 0.330; the 10 most confident errors (5 false positives with prob 0.947–0.975, 5 false negatives with prob 0.007–0.009) were watched, and the notes call their observations hypotheses from 10 clips, not findings: false negatives include speakers crying or tearing up, one has its stress in what is said rather than how it sounds, and the false positives share no single acoustic cue.
+- **Stress, no-sentiment-only ablation (`results/stress/nosent_comparison.csv`):** audio model, 15 runs each, on the clips that remain after dropping those labelled only "audio stress" (mean 61.0 test clips per run, versus 77.0 for all clips): original model scored on those clips accuracy 0.582 ± 0.105, macro-F1 0.542 ± 0.068, ROC-AUC 0.610 ± 0.106; model retrained without those clips 0.613 ± 0.152, 0.570 ± 0.111, 0.609 ± 0.149 (std larger than the differences).
 - **Deception (`results/deception/errors_notes.md`, DRAFT):** the 5 most confident late-fusion errors per dataset (10 clips, mostly missed lies, 2 with mostly no face found) are listed, but the `Watched:` field is empty for all of them, so no findings yet.
 
 ## 8. Lighting robustness (BoL deception, brightness perturbation of the video)
@@ -314,4 +314,4 @@ Every cell is within chance range, including the unperturbed one, so this single
 
 ## Source files used
 
-All CSV/text files under `results/` were inspected; `*_predictions.csv` files were used only for the recomputed p-values and per-dataset fine-tuning metrics. `deception/runs/*_summary.csv`, `runs/*_runs.csv`, the `*_smoke*`-free per-run files and `run_all.log` were read for cross-checks only (they carry the same numbers as `deep.csv`). `leakage_ablation_overlap.csv` was used for the overlap column. The stress from-scratch audio row in section 1 comes from `stress/scratch_audio.csv` and `stress/runs/scratch_audio_runs.csv`.
+All CSV/text files under `results/` were inspected; `*_predictions.csv` files were used only for the recomputed p-values and per-dataset fine-tuning metrics. `deception/runs/*_summary.csv`, `runs/*_runs.csv`, the `*_smoke*`-free per-run files and `run_all.log` were read for cross-checks only (they carry the same numbers as `deep.csv`). `leakage_ablation_overlap.csv` was used for the overlap column. The stress from-scratch audio row in section 1 comes from `stress/scratch_audio.csv` and `stress/runs/scratch_audio_runs.csv`. Section 7 (stress) uses `stress/error_notes.md`, `stress/errors.csv`, `stress/errors_summary.csv`, `stress/nosent_comparison.csv` and the docstring at the top of `src/stress/analysis.py` (read for the definition of the sentiment-only tag and the no-sentiment variant).
